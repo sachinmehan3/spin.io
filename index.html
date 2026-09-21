@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>beyblade.io</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="hidden">
+      <div class="panel status">
+        <div class="meter-label"><span>SPIN</span><span id="spin-text">100 / 100</span></div>
+        <div class="meter"><div id="spin-fill" class="fill"></div></div>
+        <div class="meter-label"><span>DASH</span><span id="dash-text">READY</span></div>
+        <div class="meter small"><div id="dash-fill" class="fill dash"></div></div>
+        <div class="kos">Knockouts <b id="ko-count">0</b></div>
+      </div>
+      <div class="panel board">
+        <h3>Leaderboard</h3>
+        <ol id="board"></ol>
+      </div>
+      <div id="feed"></div>
+      <canvas id="minimap" width="170" height="170"></canvas>
+    </div>
+
+    <button id="mute" class="mute" title="Mute (M)" aria-label="Toggle sound">SOUND ON</button>
+
+    <section id="spawn" class="overlay">
+      <div class="card">
+        <h1>beyblade<span>.io</span></h1>
+        <p class="tagline">Knock them out. Take their spin. Grow.</p>
+        <label class="field">
+          <span>Name</span>
+          <input id="name" maxlength="14" placeholder="Your name" autocomplete="off" />
+        </label>
+        <div class="field">
+          <span>Colour</span>
+          <div id="swatches" class="swatches"></div>
+        </div>
+        <div class="field">
+          <span>Top Type</span>
+          <div id="types" class="types"></div>
+        </div>
+        <button id="play" class="play">LET IT RIP</button>
+        <p class="best" id="best"></p>
+        <p class="hint">Mouse to steer · Click or Space to Dash · M to mute</p>
+      </div>
+    </section>
+
+    <section id="results" class="overlay hidden">
+      <div class="card">
+        <p class="cause" id="cause"></p>
+        <h2 id="cause-detail"></h2>
+        <div class="stats">
+          <div><b id="r-kos">0</b><span>Knockouts</span></div>
+          <div><b id="r-peak">100</b><span>Peak Max Spin</span></div>
+          <div><b id="r-time">0s</b><span>Survived</span></div>
+        </div>
+        <p class="new-best hidden" id="new-best">New personal best!</p>
+        <button id="again" class="play">PLAY AGAIN</button>
+        <button id="change" class="link">Change Top</button>
+      </div>
+    </section>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
