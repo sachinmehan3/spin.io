@@ -3,69 +3,98 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>beyblade.io</title>
+    <title>Spin.io</title>
+    <meta name="description" content="Spinning tops battle in a steel stadium. Knock them out and take their spin." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bangers&family=Exo+2:ital,wght@0,500;0,700;1,700;1,800;1,900&display=swap"
       rel="stylesheet"
     />
   </head>
   <body>
+      <symbol id="scribble" viewBox="0 0 300 100" preserveAspectRatio="none">
+        <path vector-effect="non-scaling-stroke" d="M 42 62 C 22 24, 236 4, 280 42 C 306 70, 128 100, 38 76 C 4 64, 40 22, 172 18" />
+      </symbol>
+    </svg>
+
     <canvas id="game"></canvas>
 
     <div id="hud" class="hidden">
-      <div class="panel status">
-        <div class="meter-label"><span>SPIN</span><span id="spin-text">100 / 100</span></div>
-        <div class="meter"><div id="spin-fill" class="fill"></div></div>
-        <div class="meter-label"><span>DASH</span><span id="dash-text">READY</span></div>
-        <div class="meter small"><div id="dash-fill" class="fill dash"></div></div>
-        <div class="kos">Knockouts <b id="ko-count">0</b></div>
+      <div class="gauges">
+        <div class="gauge">
+          <span class="gauge-name">spin</span>
+          <div class="bar"><div id="spin-fill" class="fill"></div></div>
+          <span id="spin-text" class="gauge-value">100</span>
+        </div>
+        <div class="gauge">
+          <span class="gauge-name">dash</span>
+          <div class="bar thin"><div id="dash-fill" class="fill dash"></div></div>
+          <span id="dash-text" class="gauge-value">ready</span>
+        </div>
+        <div class="gauge">
+          <span class="gauge-name">knockouts</span>
+          <span id="ko-count" class="tally-slot"></span>
+        </div>
       </div>
-      <div class="panel board">
-        <h3>Leaderboard</h3>
+      <div class="board">
+        <h2>Biggest tops</h2>
         <ol id="board"></ol>
       </div>
-      <div id="feed"></div>
-      <canvas id="minimap" width="170" height="170"></canvas>
+      <div id="feed"  aria-live="polite"></div>
+      <canvas id="minimap" width="170" height="170" aria-hidden="true"></canvas>
     </div>
 
-    <button id="mute" class="mute" title="Mute (M)" aria-label="Toggle sound">SOUND ON</button>
+    <button id="mute" class="mute">sound on</button>
 
     <section id="spawn" class="overlay">
-      <div class="card">
-        <h1>beyblade<span>.io</span></h1>
-        <p class="tagline">Knock them out. Take their spin. Grow.</p>
-        <label class="field">
-          <span>Name</span>
-          <input id="name" maxlength="14" placeholder="Your name" autocomplete="off" />
-        </label>
-        <div class="field">
-          <span>Colour</span>
-          <div id="swatches" class="swatches"></div>
+      <div class="frame">
+        <div class="slate">
+          <h1>Spin.io</h1>
+          <p class="tagline">Knock them out of the ring and take their spin.</p>
+
+          <label class="name-line">
+            <span>Your name</span>
+            <input id="name" maxlength="14" placeholder="write it here" autocomplete="off" spellcheck="false" />
+          </label>
+
+          <fieldset class="picker">
+            <legend>Pick a top</legend>
+            <div id="types" class="types" role="radiogroup" aria-label="Top type"></div>
+          </fieldset>
+
+          <button id="play" class="rip">
+            Let it rip!
+            <svg class="scribble" aria-hidden="true"><use href="#scribble" width="100%" height="100%" /></svg>
+          </button>
+
+          <p id="best" class="note"></p>
+          <p class="note">Steer with your mouse. Click or press space to dash. M mutes the sound.</p>
         </div>
-        <div class="field">
-          <span>Top Type</span>
-          <div id="types" class="types"></div>
+        <div class="tray">
+          <span class="tray-label">Colour</span>
+          <div id="swatches" class="sticks" role="radiogroup" aria-label="Colour"></div>
         </div>
-        <button id="play" class="play">LET IT RIP</button>
-        <p class="best" id="best"></p>
-        <p class="hint">Mouse to steer · Click or Space to Dash · M to mute</p>
       </div>
     </section>
 
     <section id="results" class="overlay hidden">
-      <div class="card">
-        <p class="cause" id="cause"></p>
-        <h2 id="cause-detail"></h2>
-        <div class="stats">
-          <div><b id="r-kos">0</b><span>Knockouts</span></div>
-          <div><b id="r-peak">100</b><span>Peak Max Spin</span></div>
-          <div><b id="r-time">0s</b><span>Survived</span></div>
+      <div class="frame">
+        <div class="slate">
+          <h2 id="cause-detail" class="verdict"></h2>
+          <dl class="stats">
+            <div><dt>Knockouts</dt><dd id="r-kos"></dd></div>
+            <div><dt>Biggest you got</dt><dd id="r-peak"></dd></div>
+            <div><dt>Lasted</dt><dd id="r-time"></dd></div>
+          </dl>
+          <p id="new-best" class="new-best hidden">New personal best!</p>
+          <button id="again" class="rip">
+            Play again
+            <svg class="scribble" aria-hidden="true"><use href="#scribble" width="100%" height="100%" /></svg>
+          </button>
+          <button id="change" class="link">Pick a different top</button>
         </div>
-        <p class="new-best hidden" id="new-best">New personal best!</p>
-        <button id="again" class="play">PLAY AGAIN</button>
-        <button id="change" class="link">Change Top</button>
+        <div class="tray"></div>
       </div>
     </section>
 

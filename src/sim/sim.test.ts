@@ -40,7 +40,26 @@ describe("Burst", () => {
     );
   });
 
-  it("gives no Credit to a Top that is Burst in the same Clash", () => {
+  it("never Bursts the attacker: a weakened Top that Dashes into another weakened Top wins", () => {
+    const world = emptyArena();
+    const attacker = addTop(world, { x: -70, y: 0, vx: 900, vy: 0, spin: 10 });
+    const target = addTop(world, { x: 0, y: 0, spin: 10 });
+
+    const events = runUntil(world, () => !target.alive, 60);
+
+    expect(attacker.alive).toBe(true);
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "knockout", victim: target.id, cause: "burst", credit: attacker.id }),
+    );
+    expect(attacker.maxSpin).toBeGreaterThan(100);
+    expect(attacker.spin).toBeGreaterThan(10);
+
+    // It keeps its reward rather than spinning out a moment later.
+    runUntil(world, () => world.time > 1);
+    expect(attacker.alive).toBe(true);
+  });
+
+  it("Bursts both Tops, crediting neither, when they hit each other equally hard", () => {
     const world = emptyArena();
     const a = addTop(world, { x: -60, y: 0, vx: 600, vy: 0, spin: 10 });
     const b = addTop(world, { x: 60, y: 0, vx: -600, vy: 0, spin: 10 });

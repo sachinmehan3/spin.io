@@ -79,7 +79,8 @@ const BOT_NAMES = [
   "Vortex", "Talon", "Nova", "Kestrel", "Ember", "Riptide", "Onyx", "Zephyr", "Quake", "Halo",
   "Fang", "Cinder", "Mistral", "Bolt", "Glacier", "Sable", "Comet", "Rook", "Tempest", "Jinx",
 ];
-const BOT_COLORS = ["#ff5d73", "#ffb547", "#ffe45e", "#7bf1a8", "#4cc9f0", "#9d8cff", "#f472d0", "#ff8a5b"];
+// The Player palette, minus white: a white Top is always a Player's pick.
+const BOT_COLORS = ["#2f7bff", "#ff3b3b", "#ffb400", "#19d38a", "#a45bff", "#ff5fcf", "#00d5ff"];
 
 const pick = <T>(world: World, list: readonly T[]) => list[Math.floor(nextRandom(world) * list.length)];
 

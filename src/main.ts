@@ -2,7 +2,7 @@ import "./style.css";
 import { Sound } from "./game/audio";
 import { PlayerInput } from "./game/input";
 import { Renderer } from "./game/renderer";
-import { drawTopBody } from "./game/shapes";
+import { COLORS, drawTop } from "./game/art";
 import { loadBest, loadIdentity, loadMuted, recordLife, saveIdentity, saveMuted } from "./game/storage";
 import {
   CONFIG,
@@ -26,17 +26,28 @@ const RESULTS_DELAY = 1.3;
 /** Longest real time simulated in one frame (e.g. after the tab was in the background). */
 const MAX_FRAME_TIME = 0.25;
 
-const COLORS = ["#4cc9f0", "#f72585", "#7bf1a8", "#ffb547", "#9d8cff", "#ff5d73", "#ffe45e", "#ffffff"];
-const KNOCKOUT_TEXT: Record<KnockoutCause, { title: string; verb: string; by: string; alone: string }> = {
-  burst: { title: "Burst", verb: "Burst", by: "Shattered by", alone: "Shattered" },
-  "ring-out": { title: "Ring-out", verb: "Rang out", by: "Knocked out by", alone: "Fell off the Rim" },
-  "spin-out": { title: "Spin-out", verb: "Spun out", by: "Spun out by", alone: "Ran out of Spin" },
+/** The colours a Player can pick for their Top. */
+const STICKS: { name: string; color: string }[] = [
+  { name: "Blue", color: COLORS.blue },
+  { name: "Red", color: COLORS.red },
+  { name: "Gold", color: COLORS.gold },
+  { name: "Green", color: COLORS.green },
+  { name: "Purple", color: COLORS.purple },
+  { name: "Pink", color: COLORS.pink },
+  { name: "Cyan", color: COLORS.cyan },
+  { name: "White", color: COLORS.white },
+];
+const KNOCKOUT_TEXT: Record<KnockoutCause, { verb: string; by: string; alone: string }> = {
+  burst: { verb: "You burst", by: "Burst by", alone: "You burst apart" },
+  "ring-out": { verb: "You rang out", by: "Rung out by", alone: "You rolled out of the ring" },
+  "spin-out": { verb: "You spun out", by: "Spun out by", alone: "You ran out of spin" },
 };
 const TYPE_INFO: Record<TopType, { label: string; blurb: string }> = {
-  attack: { label: "Attack", blurb: "Fast, hard Dash. Loses Spin quickly." },
-  defense: { label: "Defense", blurb: "Heavy, hard to push. Slow." },
-  stamina: { label: "Stamina", blurb: "Loses Spin slowly. Hits softly." },
+  attack: { label: "Attack", blurb: "Quick, with a hard dash. Tires fast." },
+  defense: { label: "Defense", blurb: "Heavy and hard to shove. Slow." },
+  stamina: { label: "Stamina", blurb: "Spins for ages. Hits softly." },
 };
+const SCRIBBLE = `<svg class="scribble" aria-hidden="true"><use href="#scribble" width="100%" height="100%" /></svg>`;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -48,7 +59,9 @@ const sound = new Sound();
 const world = createWorld({ seed: Date.now() % 2 ** 31, bots: BOT_COUNT, pickups: PICKUP_COUNT });
 let player: Top | null = null;
 let spawnedAt = 0;
-let identity: Identity = loadIdentity() ?? { name: "", color: COLORS[0], type: "attack" };
+let identity: Identity = loadIdentity() ?? { name: "", color: COLORS.blue, type: "attack" };
+// Older saves may hold a colour from an earlier palette.
+if (!STICKS.some((s) => s.color === identity.color)) identity = { ...identity, color: COLORS.blue };
 let resultsDueAt: number | null = null;
 let lastKnockout: { cause: KnockoutCause; by: string | null; time: number; newBest: boolean } | null = null;
 
@@ -58,12 +71,12 @@ const nameInput = $<HTMLInputElement>("name");
 nameInput.value = identity.name;
 
 const swatches = $("swatches");
-for (const color of COLORS) {
+for (const { name, color } of STICKS) {
   const b = document.createElement("button");
-  b.className = "swatch";
-  b.style.background = color;
-  b.style.color = color;
-  b.setAttribute("aria-label", `Colour ${color}`);
+  b.className = "stick";
+  b.style.setProperty("--stick", color);
+  b.setAttribute("role", "radio");
+  b.setAttribute("aria-label", name);
   b.addEventListener("click", () => {
     identity = { ...identity, color };
     refreshChoices();
@@ -74,14 +87,15 @@ for (const color of COLORS) {
 const typeButtons = new Map<TopType, { button: HTMLButtonElement; preview: HTMLCanvasElement }>();
 for (const type of TOP_TYPES) {
   const button = document.createElement("button");
-  button.className = "type";
+  button.className = "type chalk-text";
+  button.setAttribute("role", "radio");
   const preview = document.createElement("canvas");
-  preview.width = 64;
-  preview.height = 64;
+  preview.width = 152;
+  preview.height = 152;
   button.append(preview);
   button.insertAdjacentHTML(
     "beforeend",
-    `<b>${TYPE_INFO[type].label}</b><small>${TYPE_INFO[type].blurb}</small>`,
+    `<b>${TYPE_INFO[type].label}</b><small>${TYPE_INFO[type].blurb}</small>${SCRIBBLE}`,
   );
   button.addEventListener("click", () => {
     identity = { ...identity, type };
@@ -92,14 +106,14 @@ for (const type of TOP_TYPES) {
 }
 
 function refreshChoices() {
-  swatches.querySelectorAll<HTMLButtonElement>(".swatch").forEach((b, i) => {
-    b.classList.toggle("selected", COLORS[i] === identity.color);
+  swatches.querySelectorAll<HTMLButtonElement>(".stick").forEach((b, i) => {
+    b.setAttribute("aria-checked", String(STICKS[i].color === identity.color));
   });
-  for (const [type, { button }] of typeButtons) button.classList.toggle("selected", type === identity.type);
+  for (const [type, { button }] of typeButtons) button.setAttribute("aria-checked", String(type === identity.type));
   const best = loadBest();
   $("best").textContent =
     best.peakMaxSpin > 0
-      ? `Personal best: ${Math.round(best.peakMaxSpin)} Max Spin · ${best.knockouts} Knockouts`
+      ? `Your best so far: grew to ${Math.round(best.peakMaxSpin)} spin and knocked out ${best.knockouts}.`
       : "";
 }
 
@@ -108,9 +122,9 @@ function animatePreviews(time: number) {
   for (const [type, { preview }] of typeButtons) {
     const ctx = preview.getContext("2d")!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, 64, 64);
-    ctx.translate(32, 32);
-    drawTopBody(ctx, type, identity.color, 22, time * 0.012);
+    ctx.clearRect(0, 0, preview.width, preview.height);
+    ctx.translate(preview.width / 2, preview.height / 2);
+    drawTop(ctx, type, identity.color, 54, time * 0.006);
   }
 }
 
@@ -147,7 +161,7 @@ const muteButton = $<HTMLButtonElement>("mute");
 function applyMute(muted: boolean) {
   sound.setMuted(muted);
   saveMuted(muted);
-  muteButton.textContent = muted ? "SOUND OFF" : "SOUND ON";
+  muteButton.textContent = muted ? "sound off" : "sound on";
 }
 muteButton.addEventListener("click", () => applyMute(!sound.muted));
 window.addEventListener("keydown", (e) => {
@@ -171,14 +185,14 @@ function watchPlayer(events: SimEvent[]) {
       lastKnockout = { cause: e.cause, by: nameOf(e.credit), time: world.time, newBest };
       resultsDueAt = world.time + RESULTS_DELAY;
     } else if (e.credit === player.id) {
-      toast(`${KNOCKOUT_TEXT[e.cause].verb} ${nameOf(e.victim)}!`, true);
+      toast(`${KNOCKOUT_TEXT[e.cause].verb} ${nameOf(e.victim)}!`);
     }
   }
 }
 
-function toast(text: string, good = false) {
+function toast(text: string) {
   const el = document.createElement("div");
-  el.className = `toast${good ? " good" : ""}`;
+  el.className = "toast";
   el.textContent = text;
   $("feed").prepend(el);
   setTimeout(() => el.remove(), 2400);
@@ -188,9 +202,8 @@ function showResults() {
   if (!player || !lastKnockout) return;
   const { cause, by, time, newBest } = lastKnockout;
   const text = KNOCKOUT_TEXT[cause];
-  $("cause").textContent = text.title;
   $("cause-detail").textContent = by ? `${text.by} ${by}` : text.alone;
-  $("r-kos").textContent = String(player.knockouts);
+  $("r-kos").innerHTML = tally(player.knockouts);
   $("r-peak").textContent = String(Math.round(player.maxSpin));
   $("r-time").textContent = formatTime(time - spawnedAt);
   $("new-best").classList.toggle("hidden", !newBest);
@@ -203,6 +216,25 @@ function formatTime(seconds: number) {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
 }
 
+/** Knockouts counted the playground way: tally marks in fives. Big numbers are just written. */
+function tally(n: number): string {
+  if (n === 0 || n > 20) return `<span class="count">${n}</span>`;
+  const lines: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const x = Math.floor(i / 5) * 44 + (i % 5) * 8 + 4;
+    if (i % 5 === 4) {
+      lines.push(`<line x1="${x - 36}" y1="20" x2="${x - 2}" y2="6" />`);
+    } else {
+      const lean = ((i * 7) % 3) - 1;
+      lines.push(`<line x1="${x}" y1="3" x2="${x + lean}" y2="24" />`);
+    }
+  }
+  const width = Math.ceil(n / 5) * 44;
+  return `<svg viewBox="0 0 ${width} 27" width="${width}" role="img" aria-label="${n}" stroke="currentColor" stroke-width="3" stroke-linecap="round">${lines.join("")}</svg>`;
+}
+
+let shownKnockouts = -1;
+
 // ---------- HUD ----------
 
 let boardRefreshAt = 0;
@@ -213,12 +245,15 @@ function updateHud() {
   const fill = $("spin-fill");
   fill.style.width = `${frac * 100}%`;
   fill.classList.toggle("low", frac < 0.3);
-  $("spin-text").textContent = `${Math.ceil(player.spin)} / ${Math.round(player.maxSpin)}`;
+  $("spin-text").textContent = String(Math.ceil(player.spin));
 
   const wait = Math.max(0, player.dashReadyAt - world.time);
   $("dash-fill").style.width = `${(1 - wait / CONFIG.dashCooldown) * 100}%`;
-  $("dash-text").textContent = wait > 0 ? `${wait.toFixed(1)}s` : "READY";
-  $("ko-count").textContent = String(player.knockouts);
+  $("dash-text").textContent = wait > 0 ? `${wait.toFixed(1)}s` : "ready";
+  if (player.knockouts !== shownKnockouts) {
+    shownKnockouts = player.knockouts;
+    $("ko-count").innerHTML = tally(player.knockouts);
+  }
 
   if (world.time < boardRefreshAt) return;
   boardRefreshAt = world.time + 0.25;
@@ -232,14 +267,12 @@ function updateHud() {
 function boardRow(rank: number, t: Top) {
   const li = document.createElement("li");
   if (t === player) li.className = "me";
-  const dot = document.createElement("span");
-  dot.className = "dot";
-  dot.style.background = t.color;
   const who = document.createElement("span");
   who.className = "who";
+  who.style.setProperty("--dot", t.color);
   who.textContent = t.name;
   li.innerHTML = `<span class="rank">${rank}</span>`;
-  li.append(dot, who);
+  li.append(who);
   li.insertAdjacentHTML("beforeend", `<span class="size">${Math.round(t.maxSpin)}</span>`);
   return li;
 }
@@ -252,7 +285,9 @@ let accumulator = 0;
 function frame(now: number) {
   const elapsed = Math.min(MAX_FRAME_TIME, (now - lastFrameTime) / 1000);
   lastFrameTime = now;
-  accumulator += elapsed;
+  // A heavy hit freezes the action for a split second (hit-stop), then play resumes.
+  if (renderer.hitStop > 0) renderer.hitStop -= elapsed;
+  else accumulator += elapsed;
 
   while (accumulator >= CONFIG.dt) {
     const inputs = player?.alive ? { [player.id]: input.take(renderer.worldToScreen(player.pos)) } : {};

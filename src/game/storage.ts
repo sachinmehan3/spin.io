@@ -3,7 +3,9 @@ import type { Identity } from "../sim";
 // Per-browser conveniences only. Storage may be unavailable (private mode, blocked site
 // data), so every access is guarded and the game works without it.
 
-const KEY = "beyblade.io/v1";
+const KEY = "spin.io/v1";
+/** Where saves lived before the game was renamed; read once so nobody loses their best. */
+const OLD_KEY = "beyblade.io/v1";
 
 export interface PersonalBest {
   peakMaxSpin: number;
@@ -18,7 +20,7 @@ interface Saved {
 
 function load(): Saved {
   try {
-    const saved: unknown = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    const saved: unknown = JSON.parse(localStorage.getItem(KEY) ?? localStorage.getItem(OLD_KEY) ?? "{}");
     return saved && typeof saved === "object" ? (saved as Saved) : {};
   } catch {
     return {};

@@ -1,4 +1,4 @@
-# beyblade.io (working title)
+# Spin.io
 
 A browser .io game where spinning tops battle in a shared arena, knocking each other out to grow. Single player against bots for now; multiplayer planned.
 
@@ -63,6 +63,10 @@ _Avoid_: Hit, attack, bump
 How hard a Clash is, measured by how fast the two Tops close on each other. It sets how much Spin is lost and whether a Burst happens.
 _Avoid_: Force, damage, power
 
+**Attacker**:
+In a Clash, the Top driving into the other harder. The Attacker can't be Burst by that Clash. When both Tops hit each other equally hard, there is no Attacker.
+_Avoid_: Hitter, aggressor
+
 **Knockback**:
 The push that separates two Tops after a Clash. Lighter Tops and Tops with less Spin are pushed further.
 
@@ -79,7 +83,7 @@ A Knockout where a Top's Spin reaches zero.
 A Knockout where a Top is pushed over the Rim.
 
 **Burst**:
-A Knockout where a single Clash destroys a Top outright, even though it still has Spin left. It happens only when the Impact is large compared with the target's current Spin, so only a weakened Top can be Burst.
+A Knockout where a single Clash destroys a Top outright, even though it still has Spin left. It happens only when the Impact is large compared with the target's current Spin, so only a weakened Top can be Burst, and never to the Attacker.
 
 **Credit**:
 Who a Knockout is awarded to: the last Top to Clash with the victim shortly before it was knocked out. A Knockout can have no Credit.

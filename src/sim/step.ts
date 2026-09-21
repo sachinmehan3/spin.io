@@ -155,7 +155,10 @@ function resolveClash(a: Top, b: Top, aSafe: boolean, bSafe: boolean): (ClashEve
   b.pos.x += nx * bMoves;
   b.pos.y += ny * bMoves;
 
-  const impact = (a.vel.x - b.vel.x) * nx + (a.vel.y - b.vel.y) * ny;
+  // How hard each Top drives into the other, before Knockback changes their velocities.
+  const aDrive = a.vel.x * nx + a.vel.y * ny;
+  const bDrive = -(b.vel.x * nx + b.vel.y * ny);
+  const impact = aDrive + bDrive;
   if (impact <= 0) return null;
 
   const steadyA = steadyMassOf(a);
@@ -169,11 +172,13 @@ function resolveClash(a: Top, b: Top, aSafe: boolean, bSafe: boolean): (ClashEve
   if (impact < CONFIG.minClashImpact) return null;
 
   // Judged on Spin before this Clash's loss, so Burst depends on how weakened the Top already was.
+  // The attacker (the Top driving in harder) is never Burst by its own attack; on a dead-even
+  // collision there is no attacker and both can Burst.
   const powerA = TYPE_STATS[a.type].clashPower;
   const powerB = TYPE_STATS[b.type].clashPower;
   const bursts: Top[] = [];
-  if (!aSafe && impact * powerB >= CONFIG.burstRatio * a.spin) bursts.push(a);
-  if (!bSafe && impact * powerA >= CONFIG.burstRatio * b.spin) bursts.push(b);
+  if (!aSafe && aDrive <= bDrive && impact * powerB >= CONFIG.burstRatio * a.spin) bursts.push(a);
+  if (!bSafe && bDrive <= aDrive && impact * powerA >= CONFIG.burstRatio * b.spin) bursts.push(b);
 
   // The Top with more Spin takes the smaller share of the loss, scaled by the other's Clash power (ADR 0001).
   const total = impact * CONFIG.spinLossPerImpact;
