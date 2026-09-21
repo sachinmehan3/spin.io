@@ -3,6 +3,7 @@ import { nextRandom } from "./rng";
 import { massOf, radiusOf } from "./stats";
 import type { Top, TopInput, Vec, World } from "./types";
 
+/** How far (px) a Bot notices other Tops. */
 const SIGHT = 700;
 /** Beyond this fraction of the Arena radius, a Bot starts steering back toward the centre. */
 const RIM_COMFORT = 0.72;
@@ -52,9 +53,9 @@ export function botInput(world: World, me: Top): TopInput {
     const reach = radiusOf(me) + radiusOf(prey) + DASH_REACH;
     dash = preyDist < reach && me.spin > me.maxSpin * 0.3 && world.time >= me.dashReadyAt;
   } else {
-    const food = nearestPickup(world, me);
-    if (food) {
-      pull(food.x - me.pos.x, food.y - me.pos.y, 1);
+    const pickup = nearestPickup(world, me);
+    if (pickup) {
+      pull(pickup.x - me.pos.x, pickup.y - me.pos.y, 1);
     } else {
       mind.wander += (nextRandom(world) - 0.5) * 0.3;
       pull(Math.cos(mind.wander), Math.sin(mind.wander), 0.6);

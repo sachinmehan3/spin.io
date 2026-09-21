@@ -10,6 +10,7 @@ import {
   leaderboard,
   spawnTop,
   step,
+  TOP_TYPES,
   type Identity,
   type KnockoutCause,
   type SimEvent,
@@ -26,6 +27,11 @@ const RESULTS_DELAY = 1.3;
 const MAX_FRAME_TIME = 0.25;
 
 const COLORS = ["#4cc9f0", "#f72585", "#7bf1a8", "#ffb547", "#9d8cff", "#ff5d73", "#ffe45e", "#ffffff"];
+const KNOCKOUT_TEXT: Record<KnockoutCause, { title: string; verb: string; by: string; alone: string }> = {
+  burst: { title: "Burst", verb: "Burst", by: "Shattered by", alone: "Shattered" },
+  "ring-out": { title: "Ring-out", verb: "Rang out", by: "Knocked out by", alone: "Fell off the Rim" },
+  "spin-out": { title: "Spin-out", verb: "Spun out", by: "Spun out by", alone: "Ran out of Spin" },
+};
 const TYPE_INFO: Record<TopType, { label: string; blurb: string }> = {
   attack: { label: "Attack", blurb: "Fast, hard Dash. Loses Spin quickly." },
   defense: { label: "Defense", blurb: "Heavy, hard to push. Slow." },
@@ -44,7 +50,7 @@ let player: Top | null = null;
 let spawnedAt = 0;
 let identity: Identity = loadIdentity() ?? { name: "", color: COLORS[0], type: "attack" };
 let resultsDueAt: number | null = null;
-let lastKnockout: { cause: KnockoutCause; by: string | null; time: number } | null = null;
+let lastKnockout: { cause: KnockoutCause; by: string | null; time: number; newBest: boolean } | null = null;
 
 // ---------- Spawn screen ----------
 
@@ -66,7 +72,7 @@ for (const color of COLORS) {
 }
 
 const typeButtons = new Map<TopType, { button: HTMLButtonElement; preview: HTMLCanvasElement }>();
-for (const type of ["attack", "defense", "stamina"] as const) {
+for (const type of TOP_TYPES) {
   const button = document.createElement("button");
   button.className = "type";
   const preview = document.createElement("canvas");
@@ -161,11 +167,11 @@ function watchPlayer(events: SimEvent[]) {
   for (const e of events) {
     if (e.type !== "knockout") continue;
     if (e.victim === player.id) {
-      lastKnockout = { cause: e.cause, by: nameOf(e.credit), time: world.time };
+      const newBest = recordLife({ peakMaxSpin: player.maxSpin, knockouts: player.knockouts });
+      lastKnockout = { cause: e.cause, by: nameOf(e.credit), time: world.time, newBest };
       resultsDueAt = world.time + RESULTS_DELAY;
     } else if (e.credit === player.id) {
-      const verb = e.cause === "burst" ? "Burst" : e.cause === "ring-out" ? "Rang out" : "Spun out";
-      toast(`${verb} ${nameOf(e.victim)}!`, true);
+      toast(`${KNOCKOUT_TEXT[e.cause].verb} ${nameOf(e.victim)}!`, true);
     }
   }
 }
@@ -180,20 +186,14 @@ function toast(text: string, good = false) {
 
 function showResults() {
   if (!player || !lastKnockout) return;
-  const { cause, by, time } = lastKnockout;
-  const titles: Record<KnockoutCause, string> = { burst: "Burst", "ring-out": "Ring-out", "spin-out": "Spin-out" };
-  const details: Record<KnockoutCause, [string, string]> = {
-    burst: [`Shattered by ${by}`, "Shattered"],
-    "ring-out": [`Knocked out by ${by}`, "Fell off the Rim"],
-    "spin-out": [`Spun out by ${by}`, "Ran out of Spin"],
-  };
-  $("cause").textContent = titles[cause];
-  $("cause-detail").textContent = by ? details[cause][0] : details[cause][1];
+  const { cause, by, time, newBest } = lastKnockout;
+  const text = KNOCKOUT_TEXT[cause];
+  $("cause").textContent = text.title;
+  $("cause-detail").textContent = by ? `${text.by} ${by}` : text.alone;
   $("r-kos").textContent = String(player.knockouts);
   $("r-peak").textContent = String(Math.round(player.maxSpin));
   $("r-time").textContent = formatTime(time - spawnedAt);
-  const improved = recordLife({ peakMaxSpin: player.maxSpin, knockouts: player.knockouts });
-  $("new-best").classList.toggle("hidden", !improved);
+  $("new-best").classList.toggle("hidden", !newBest);
   $("hud").classList.add("hidden");
   $("results").classList.remove("hidden");
 }
@@ -222,10 +222,10 @@ function updateHud() {
 
   if (world.time < boardRefreshAt) return;
   boardRefreshAt = world.time + 0.25;
-  const ranked = [...world.tops].filter((t) => t.alive).sort((a, b) => b.maxSpin - a.maxSpin);
-  const top10 = leaderboard(world, 10);
-  const rows = top10.map((t, i) => boardRow(i + 1, t));
-  if (!top10.includes(player)) rows.push(boardRow(ranked.indexOf(player) + 1, player));
+  const ranked = leaderboard(world, Infinity);
+  const rows = ranked.slice(0, 10).map((t, i) => boardRow(i + 1, t));
+  const rank = ranked.indexOf(player) + 1;
+  if (rank > 10) rows.push(boardRow(rank, player));
   $("board").replaceChildren(...rows);
 }
 
@@ -246,12 +246,12 @@ function boardRow(rank: number, t: Top) {
 
 // ---------- Loop ----------
 
-let last = performance.now();
+let lastFrameTime = performance.now();
 let accumulator = 0;
 
 function frame(now: number) {
-  const elapsed = Math.min(MAX_FRAME_TIME, (now - last) / 1000);
-  last = now;
+  const elapsed = Math.min(MAX_FRAME_TIME, (now - lastFrameTime) / 1000);
+  lastFrameTime = now;
   accumulator += elapsed;
 
   while (accumulator >= CONFIG.dt) {
@@ -275,6 +275,11 @@ function frame(now: number) {
   if (!$("spawn").classList.contains("hidden")) animatePreviews(now);
   requestAnimationFrame(frame);
 }
+
+// A life cut short by closing the tab still counts toward the personal best.
+window.addEventListener("pagehide", () => {
+  if (player?.alive) recordLife({ peakMaxSpin: player.maxSpin, knockouts: player.knockouts });
+});
 
 refreshChoices();
 requestAnimationFrame(frame);

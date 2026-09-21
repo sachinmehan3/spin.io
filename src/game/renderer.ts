@@ -24,7 +24,7 @@ interface Fading {
 }
 
 /** What the renderer remembers about each Top between frames. Purely visual. */
-interface Look {
+interface TopVisual {
   angle: number;
   trail: Vec[];
   top: Top;
@@ -39,7 +39,7 @@ const TRAIL_LENGTH = 14;
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private mini: CanvasRenderingContext2D;
-  private looks = new Map<TopId, Look>();
+  private looks = new Map<TopId, TopVisual>();
   private particles: Particle[] = [];
   private fading: Fading[] = [];
   private cam = { x: 0, y: 0, zoom: 0.6 };
@@ -300,7 +300,7 @@ export class Renderer {
     }
   }
 
-  private drawTop(world: World, look: Look, isPlayer: boolean) {
+  private drawTop(world: World, look: TopVisual, isPlayer: boolean) {
     const ctx = this.ctx;
     const t = look.top;
     const r = radiusOf(t);
@@ -423,11 +423,10 @@ export class Renderer {
     m.arc(0, 0, CONFIG.arenaRadius * scale, 0, Math.PI * 2);
     m.stroke();
 
-    const biggest = Math.max(...world.tops.map((t) => t.maxSpin), 1);
     for (const t of world.tops) {
       if (!t.alive || t === player) continue;
-      // Only notable Tops appear, so the map shows who to fear.
-      if (t.maxSpin < biggest * 0.6 && t.maxSpin <= CONFIG.startMaxSpin * 1.2) continue;
+      // Only Tops that have grown appear, so the map shows who to fear.
+      if (t.maxSpin <= CONFIG.startMaxSpin) continue;
       m.fillStyle = t.color;
       m.beginPath();
       m.arc(t.pos.x * scale, t.pos.y * scale, 2 + Math.sqrt(t.maxSpin / CONFIG.startMaxSpin) * 1.5, 0, Math.PI * 2);

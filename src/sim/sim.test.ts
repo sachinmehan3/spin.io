@@ -40,6 +40,20 @@ describe("Burst", () => {
     );
   });
 
+  it("gives no Credit to a Top that is Burst in the same Clash", () => {
+    const world = emptyArena();
+    const a = addTop(world, { x: -60, y: 0, vx: 600, vy: 0, spin: 10 });
+    const b = addTop(world, { x: 60, y: 0, vx: -600, vy: 0, spin: 10 });
+
+    const events = runUntil(world, () => !a.alive && !b.alive, 60);
+
+    const knockouts = events.filter((e) => e.type === "knockout");
+    expect(knockouts).toHaveLength(2);
+    expect(knockouts.every((e) => e.type === "knockout" && e.credit === null)).toBe(true);
+    expect(a.maxSpin).toBe(100);
+    expect(b.maxSpin).toBe(100);
+  });
+
   it("does not destroy a healthy Top taking the same hit", () => {
     const world = emptyArena();
     addTop(world, { x: -80, y: 0, vx: 900, vy: 0 });

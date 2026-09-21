@@ -20,10 +20,10 @@ export function step(world: World, inputs: Record<TopId, TopInput>): SimEvent[] 
     if (input) applyInput(world, t, input, events);
   }
 
-  const keep = Math.pow(CONFIG.friction, dt);
+  const velocityKept = Math.pow(CONFIG.friction, dt);
   for (const t of live) {
-    t.vel.x *= keep;
-    t.vel.y *= keep;
+    t.vel.x *= velocityKept;
+    t.vel.y *= velocityKept;
     t.pos.x += t.vel.x * dt;
     t.pos.y += t.vel.y * dt;
     if (!isProtected(world, t)) t.spin = Math.max(0, t.spin - decayRate(t) * dt);
@@ -40,8 +40,11 @@ export function step(world: World, inputs: Record<TopId, TopInput>): SimEvent[] 
       events.push(clashEvent);
       a.lastClash = { by: b.id, time: world.time };
       b.lastClash = { by: a.id, time: world.time };
-      for (const [victim, hitter] of [[a, b], [b, a]] as const) {
-        if (bursts.includes(victim)) events.push(knockOut(world, victim, "burst", hitter.id));
+      for (const [victim, other] of [[a, b], [b, a]] as const) {
+        if (!bursts.includes(victim)) continue;
+        // When a Clash Bursts both Tops, neither earns Credit.
+        const credit = bursts.includes(other) ? null : other.id;
+        events.push(knockOut(world, victim, "burst", credit));
       }
     }
   }
@@ -124,7 +127,7 @@ function creditFor(world: World, victim: Top): TopId | null {
 function knockOut(world: World, victim: Top, cause: KnockoutCause, credit: TopId | null): SimEvent {
   victim.alive = false;
   if (victim.bot) world.botRespawns.push(world.time + CONFIG.botRespawnDelay);
-  const winner = world.tops.find((t) => t.id === credit);
+  const winner = world.tops.find((t) => t.id === credit && t.alive);
   if (winner) {
     winner.knockouts++;
     winner.maxSpin += victim.maxSpin * CONFIG.knockoutGrowth;
@@ -145,38 +148,38 @@ function resolveClash(a: Top, b: Top, aSafe: boolean, bSafe: boolean): (ClashEve
   const ny = dy / dist;
 
   // Push apart so they never sink into each other.
-  const ma = massOf(a);
-  const mb = massOf(b);
-  a.pos.x -= nx * overlap * (mb / (ma + mb));
-  a.pos.y -= ny * overlap * (mb / (ma + mb));
-  b.pos.x += nx * overlap * (ma / (ma + mb));
-  b.pos.y += ny * overlap * (ma / (ma + mb));
+  const aMoves = overlap * (massOf(b) / (massOf(a) + massOf(b)));
+  const bMoves = overlap - aMoves;
+  a.pos.x -= nx * aMoves;
+  a.pos.y -= ny * aMoves;
+  b.pos.x += nx * bMoves;
+  b.pos.y += ny * bMoves;
 
   const impact = (a.vel.x - b.vel.x) * nx + (a.vel.y - b.vel.y) * ny;
   if (impact <= 0) return null;
 
-  const sa = steadyMassOf(a);
-  const sb = steadyMassOf(b);
-  const j = ((1 + CONFIG.restitution) * impact) / (1 / sa + 1 / sb);
-  a.vel.x -= (j / sa) * nx;
-  a.vel.y -= (j / sa) * ny;
-  b.vel.x += (j / sb) * nx;
-  b.vel.y += (j / sb) * ny;
+  const steadyA = steadyMassOf(a);
+  const steadyB = steadyMassOf(b);
+  const impulse = ((1 + CONFIG.restitution) * impact) / (1 / steadyA + 1 / steadyB);
+  a.vel.x -= (impulse / steadyA) * nx;
+  a.vel.y -= (impulse / steadyA) * ny;
+  b.vel.x += (impulse / steadyB) * nx;
+  b.vel.y += (impulse / steadyB) * ny;
 
   if (impact < CONFIG.minClashImpact) return null;
 
   // Judged on Spin before this Clash's loss, so Burst depends on how weakened the Top already was.
-  const hitA = TYPE_STATS[a.type].hit;
-  const hitB = TYPE_STATS[b.type].hit;
+  const powerA = TYPE_STATS[a.type].clashPower;
+  const powerB = TYPE_STATS[b.type].clashPower;
   const bursts: Top[] = [];
-  if (!aSafe && impact * hitB >= CONFIG.burstRatio * a.spin) bursts.push(a);
-  if (!bSafe && impact * hitA >= CONFIG.burstRatio * b.spin) bursts.push(b);
+  if (!aSafe && impact * powerB >= CONFIG.burstRatio * a.spin) bursts.push(a);
+  if (!bSafe && impact * powerA >= CONFIG.burstRatio * b.spin) bursts.push(b);
 
-  // The Top with more Spin takes the smaller share of the loss.
+  // The Top with more Spin takes the smaller share of the loss, scaled by the other's Clash power (ADR 0001).
   const total = impact * CONFIG.spinLossPerImpact;
   const sum = a.spin + b.spin || 1;
-  const aLoss = total * (b.spin / sum) * hitB;
-  const bLoss = total * (a.spin / sum) * hitA;
+  const aLoss = total * (b.spin / sum) * powerB;
+  const bLoss = total * (a.spin / sum) * powerA;
   if (!aSafe) a.spin = Math.max(0, a.spin - aLoss);
   if (!bSafe) b.spin = Math.max(0, b.spin - bLoss);
 

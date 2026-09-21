@@ -10,13 +10,13 @@ export interface TypeStats {
   /** Multiplies natural Spin decay. */
   decay: number;
   /** Multiplies the Spin loss (and Burst power) this Top inflicts in a Clash. */
-  hit: number;
+  clashPower: number;
 }
 
 export const TYPE_STATS: Record<TopType, TypeStats> = {
-  attack: { speed: 1.15, dash: 1.25, mass: 0.9, decay: 1.35, hit: 1.3 },
-  defense: { speed: 0.85, dash: 0.9, mass: 1.6, decay: 1.0, hit: 1.0 },
-  stamina: { speed: 1.0, dash: 1.0, mass: 1.0, decay: 0.6, hit: 0.75 },
+  attack: { speed: 1.15, dash: 1.25, mass: 0.9, decay: 1.35, clashPower: 1.3 },
+  defense: { speed: 0.85, dash: 0.9, mass: 1.6, decay: 1.0, clashPower: 1.0 },
+  stamina: { speed: 1.0, dash: 1.0, mass: 1.0, decay: 0.6, clashPower: 0.75 },
 };
 
 /** Tuning knobs for the simulation. Units: pixels, seconds, Spin points. */

@@ -9,7 +9,7 @@ export interface WorldOptions {
   pickups: number;
 }
 
-const TOP_TYPES: readonly TopType[] = ["attack", "defense", "stamina"];
+export const TOP_TYPES: readonly TopType[] = ["attack", "defense", "stamina"];
 
 export function createWorld(opts: WorldOptions): World {
   const world: World = {
@@ -28,30 +28,33 @@ export function createWorld(opts: WorldOptions): World {
   return world;
 }
 
-export interface TopSetup {
+export interface Identity {
+  name: string;
+  color: string;
+  type: TopType;
+}
+
+/** An exact starting state for a Top. The Top Type defaults to Stamina. */
+export interface TopSetup extends Partial<Identity> {
   x: number;
   y: number;
   vx?: number;
   vy?: number;
   spin?: number;
   maxSpin?: number;
-  /** Defaults to Stamina. */
-  type?: TopType;
-  name?: string;
-  color?: string;
 }
 
 /** Places a Top at an exact spot; the building block for spawning and for scenarios. */
-export function addTop(world: World, s: TopSetup): Top {
-  const maxSpin = s.maxSpin ?? CONFIG.startMaxSpin;
+export function addTop(world: World, setup: TopSetup): Top {
+  const maxSpin = setup.maxSpin ?? CONFIG.startMaxSpin;
   const top: Top = {
     id: world.nextId++,
-    type: s.type ?? "stamina",
-    name: s.name ?? "",
-    color: s.color ?? "#ffffff",
-    pos: { x: s.x, y: s.y },
-    vel: { x: s.vx ?? 0, y: s.vy ?? 0 },
-    spin: s.spin ?? maxSpin,
+    type: setup.type ?? "stamina",
+    name: setup.name ?? "",
+    color: setup.color ?? "#ffffff",
+    pos: { x: setup.x, y: setup.y },
+    vel: { x: setup.vx ?? 0, y: setup.vy ?? 0 },
+    spin: setup.spin ?? maxSpin,
     maxSpin,
     alive: true,
     lastClash: null,
@@ -62,12 +65,6 @@ export function addTop(world: World, s: TopSetup): Top {
   };
   world.tops.push(top);
   return top;
-}
-
-export interface Identity {
-  name: string;
-  color: string;
-  type: TopType;
 }
 
 /** Brings a fresh Top into play at a safe spot, with Spawn Protection. */
