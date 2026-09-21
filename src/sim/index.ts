@@ -4,5 +4,6 @@ export type { BotMind, KnockoutCause, Pickup, SimEvent, Top, TopId, TopInput, To
 export { CONFIG, TYPE_STATS } from "./config";
 export { addTop, createWorld, leaderboard, spawnTop, TOP_TYPES } from "./world";
 export type { Identity, TopSetup, WorldOptions } from "./world";
+export { initPhysics } from "./physics";
 export { step } from "./step";
 export { radiusOf } from "./stats";

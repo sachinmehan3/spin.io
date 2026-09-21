@@ -1,7 +1,8 @@
 import { botInput } from "./bots";
 import { CONFIG, TYPE_STATS } from "./config";
-import { decayRate, massOf, maxSpeedOf, radiusOf, steadyMassOf } from "./stats";
-import type { KnockoutCause, SimEvent, Top, TopId, TopInput, World } from "./types";
+import { moveTops } from "./physics";
+import { decayRate, maxSpeedOf, radiusOf } from "./stats";
+import type { KnockoutCause, SimEvent, Top, TopId, TopInput, Vec, World } from "./types";
 import { refillPickups, spawnBot } from "./world";
 
 const isProtected = (world: World, t: Top) => world.time < t.protectedUntil;
@@ -21,31 +22,28 @@ export function step(world: World, inputs: Record<TopId, TopInput>): SimEvent[] 
   }
 
   const velocityKept = Math.pow(CONFIG.friction, dt);
+  const before = new Map<TopId, Vec>();
   for (const t of live) {
     t.vel.x *= velocityKept;
     t.vel.y *= velocityKept;
-    t.pos.x += t.vel.x * dt;
-    t.pos.y += t.vel.y * dt;
+    before.set(t.id, { ...t.vel });
     if (!isProtected(world, t)) t.spin = Math.max(0, t.spin - decayRate(t) * dt);
   }
 
-  for (let i = 0; i < live.length; i++) {
-    for (let j = i + 1; j < live.length; j++) {
-      const a = live[i];
-      const b = live[j];
-      if (!a.alive || !b.alive) continue;
-      const clash = resolveClash(a, b, isProtected(world, a), isProtected(world, b));
-      if (!clash) continue;
-      const { bursts, ...clashEvent } = clash;
-      events.push(clashEvent);
-      a.lastClash = { by: b.id, time: world.time };
-      b.lastClash = { by: a.id, time: world.time };
-      for (const [victim, other] of [[a, b], [b, a]] as const) {
-        if (!bursts.includes(victim)) continue;
-        // When a Clash Bursts both Tops, neither earns Credit.
-        const credit = bursts.includes(other) ? null : other.id;
-        events.push(knockOut(world, victim, "burst", credit));
-      }
+  // Rapier moves the Tops and bounces them apart; each contact is then judged as a possible Clash.
+  for (const { a, b, normal } of moveTops(world, live)) {
+    if (!a.alive || !b.alive) continue;
+    const clash = judgeClash(a, b, before.get(a.id)!, before.get(b.id)!, normal, isProtected(world, a), isProtected(world, b));
+    if (!clash) continue;
+    const { bursts, ...clashEvent } = clash;
+    events.push(clashEvent);
+    a.lastClash = { by: b.id, time: world.time };
+    b.lastClash = { by: a.id, time: world.time };
+    for (const [victim, other] of [[a, b], [b, a]] as const) {
+      if (!bursts.includes(victim)) continue;
+      // When a Clash Bursts both Tops, neither earns Credit.
+      const credit = bursts.includes(other) ? null : other.id;
+      events.push(knockOut(world, victim, "burst", credit));
     }
   }
 
@@ -138,37 +136,23 @@ function knockOut(world: World, victim: Top, cause: KnockoutCause, credit: TopId
 
 type ClashEvent = Extract<SimEvent, { type: "clash" }>;
 
-function resolveClash(a: Top, b: Top, aSafe: boolean, bSafe: boolean): (ClashEvent & { bursts: Top[] }) | null {
-  const dx = b.pos.x - a.pos.x;
-  const dy = b.pos.y - a.pos.y;
-  const dist = Math.hypot(dx, dy) || 0.0001;
-  const overlap = radiusOf(a) + radiusOf(b) - dist;
-  if (overlap <= 0) return null;
-  const nx = dx / dist;
-  const ny = dy / dist;
-
-  // Push apart so they never sink into each other.
-  const aMoves = overlap * (massOf(b) / (massOf(a) + massOf(b)));
-  const bMoves = overlap - aMoves;
-  a.pos.x -= nx * aMoves;
-  a.pos.y -= ny * aMoves;
-  b.pos.x += nx * bMoves;
-  b.pos.y += ny * bMoves;
-
-  // How hard each Top drives into the other, before Knockback changes their velocities.
-  const aDrive = a.vel.x * nx + a.vel.y * ny;
-  const bDrive = -(b.vel.x * nx + b.vel.y * ny);
+/**
+ * Judges a contact as a Clash from the velocities the Tops arrived with (`va`, `vb`, before
+ * Knockback). Knockback itself is left to the physics engine.
+ */
+function judgeClash(
+  a: Top,
+  b: Top,
+  va: Vec,
+  vb: Vec,
+  n: Vec,
+  aSafe: boolean,
+  bSafe: boolean,
+): (ClashEvent & { bursts: Top[] }) | null {
+  // How hard each Top drove into the other.
+  const aDrive = va.x * n.x + va.y * n.y;
+  const bDrive = -(vb.x * n.x + vb.y * n.y);
   const impact = aDrive + bDrive;
-  if (impact <= 0) return null;
-
-  const steadyA = steadyMassOf(a);
-  const steadyB = steadyMassOf(b);
-  const impulse = ((1 + CONFIG.restitution) * impact) / (1 / steadyA + 1 / steadyB);
-  a.vel.x -= (impulse / steadyA) * nx;
-  a.vel.y -= (impulse / steadyA) * ny;
-  b.vel.x += (impulse / steadyB) * nx;
-  b.vel.y += (impulse / steadyB) * ny;
-
   if (impact < CONFIG.minClashImpact) return null;
 
   // Judged on Spin before this Clash's loss, so Burst depends on how weakened the Top already was.
@@ -193,7 +177,7 @@ function resolveClash(a: Top, b: Top, aSafe: boolean, bSafe: boolean): (ClashEve
     a: a.id,
     b: b.id,
     impact,
-    at: { x: a.pos.x + nx * radiusOf(a), y: a.pos.y + ny * radiusOf(a) },
+    at: { x: a.pos.x + n.x * radiusOf(a), y: a.pos.y + n.y * radiusOf(a) },
     bursts,
   };
 }

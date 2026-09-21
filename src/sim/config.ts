@@ -67,6 +67,12 @@ export const CONFIG = {
 
   /** Bounciness of a Clash; above 1 adds a little extra Knockback. */
   restitution: 1.15,
+  /** How far ahead (px) collisions are predicted; must beat the distance a Dash covers in one step. */
+  collisionLookahead: 100,
+  /** Grip between Tops' spinning surfaces: how hard a Clash deflects them sideways. */
+  clashGrip: 0.25,
+  /** How fast a Top at full Spin turns (radians/s); enough that its grip always slips. */
+  spinRate: 40,
   /** Closing speeds below this are resting contact, not a Clash. */
   minClashImpact: 30,
   /** Total Spin lost across both Tops per unit of Impact. */

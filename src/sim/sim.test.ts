@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { addTop, CONFIG, createWorld, leaderboard, spawnTop, step } from "./index";
+import { addTop, CONFIG, createWorld, initPhysics, leaderboard, spawnTop, step } from "./index";
+
+await initPhysics();
 
 const emptyArena = () => createWorld({ seed: 1, bots: 0, pickups: 0 });
 
@@ -492,5 +494,59 @@ describe("Bot names", () => {
 
     const names = world.tops.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe("Collisions", () => {
+  const overlapping = (world: ReturnType<typeof createWorld>) => {
+    const live = world.tops.filter((t) => t.alive);
+    let worst = 0;
+    for (let i = 0; i < live.length; i++) {
+      for (let j = i + 1; j < live.length; j++) {
+        const a = live[i];
+        const b = live[j];
+        const gap = Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y) - 2 * CONFIG.baseRadius;
+        worst = Math.max(worst, -gap);
+      }
+    }
+    return worst;
+  };
+
+  it("never lets a Top pass through another, however fast it goes", () => {
+    const world = emptyArena();
+    // At this speed it moves 100px a step, from well clear to past the other Top's centre.
+    const bullet = addTop(world, { x: -180, y: 0, vx: 6000, vy: 0 });
+    const wall = addTop(world, { x: 0, y: 0, type: "defense" });
+
+    const events = runUntil(world, () => world.time > 0.2);
+
+    expect(events).toContainEqual(expect.objectContaining({ type: "clash" }));
+    expect(bullet.pos.x).toBeLessThan(wall.pos.x);
+  });
+
+  it("keeps a crowd of Tops from sinking into each other", () => {
+    const world = emptyArena();
+    for (let i = 0; i < 16; i++) addTop(world, { x: Math.cos(i) * 150, y: Math.sin(i) * 150, type: "attack" });
+    // Everyone drives into the middle and Dashes now and then.
+    const inward = (t: { pos: { x: number; y: number } }) => ({ dir: { x: -t.pos.x, y: -t.pos.y } });
+
+    let worst = 0;
+    for (let i = 0; i < 120; i++) {
+      step(world, Object.fromEntries(world.tops.map((t, j) => [t.id, { ...inward(t), dash: (i + j) % 30 === 0 }])));
+      worst = Math.max(worst, overlapping(world));
+    }
+
+    expect(worst).toBeLessThan(15);
+  });
+
+  it("sends Tops skidding sideways off a head-on Clash, as spinning tops do", () => {
+    const world = emptyArena();
+    const a = addTop(world, { x: -60, y: 0, vx: 300, vy: 0 });
+    const b = addTop(world, { x: 60, y: 0, vx: -300, vy: 0 });
+
+    runUntil(world, () => world.time > 0.3);
+
+    expect(Math.abs(a.vel.y)).toBeGreaterThan(20);
+    expect(Math.sign(a.vel.y)).toBe(-Math.sign(b.vel.y));
   });
 });

@@ -7,6 +7,7 @@ import { loadBest, loadIdentity, loadMuted, recordLife, saveIdentity, saveMuted 
 import {
   CONFIG,
   createWorld,
+  initPhysics,
   leaderboard,
   spawnTop,
   step,
@@ -56,6 +57,7 @@ const renderer = new Renderer(canvas, $<HTMLCanvasElement>("minimap"));
 const input = new PlayerInput(canvas);
 const sound = new Sound();
 
+await initPhysics();
 const world = createWorld({ seed: Date.now() % 2 ** 31, bots: BOT_COUNT, pickups: PICKUP_COUNT });
 let player: Top | null = null;
 let spawnedAt = 0;
