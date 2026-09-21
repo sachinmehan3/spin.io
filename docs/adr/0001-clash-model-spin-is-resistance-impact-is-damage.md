@@ -1,0 +1,9 @@
+# Clash model: Spin decides resistance, Impact decides damage
+
+In a Clash, damage comes from Impact (how fast the two Tops close on each other), not from comparing their Spin. Both Tops lose Spin, and the Top with more Spin loses the smaller share. A Burst happens only when the Impact is large compared with the target's current Spin, so only a weakened Top can be Burst. We chose this so that a smaller Top that Dashes in well can beat a bigger one that's drifting, and so the leader doesn't snowball.
+
+## Considered Options
+
+- **More Spin wins the Clash outright.** Rejected: it's deterministic, how you play doesn't matter, and the leader runs away with the game.
+- **Burst is a random chance on hard hits** (as in the anime). Rejected: it feels unfair and would be hard to explain once multiplayer arrives.
+- **A separate Burst gauge.** Rejected: it's effectively a second health bar, and Spin is meant to be the only health resource.
