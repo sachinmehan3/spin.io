@@ -1,9 +1,9 @@
 import "./style.css";
-import { Sound } from "./game/audio";
+import { Sound, type ClashStyle } from "./game/audio";
 import { PlayerInput } from "./game/input";
 import { Renderer } from "./game/renderer";
 import { COLORS, drawTop } from "./game/art";
-import { loadBest, loadIdentity, loadMuted, recordLife, saveIdentity, saveMuted } from "./game/storage";
+import { loadBest, loadClashStyle, loadIdentity, loadMuted, recordLife, saveClashStyle, saveIdentity, saveMuted } from "./game/storage";
 import {
   CONFIG,
   createWorld,
@@ -132,6 +132,7 @@ function play() {
   identity = { ...identity, name: nameInput.value.trim().slice(0, 14) || "Player" };
   saveIdentity(identity);
   sound.unlock();
+  sound.launch();
   input.clear();
   player = spawnTop(world, identity);
   spawnedAt = world.time;
@@ -155,7 +156,7 @@ $("change").addEventListener("click", () => {
   refreshChoices();
 });
 
-// ---------- Sound toggle ----------
+// ---------- Sound toggles ----------
 
 const muteButton = $<HTMLButtonElement>("mute");
 function applyMute(muted: boolean) {
@@ -168,6 +169,15 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyM" && !(e.target instanceof HTMLInputElement)) applyMute(!sound.muted);
 });
 applyMute(loadMuted());
+
+const clashButton = $<HTMLButtonElement>("clash-style");
+function applyClashStyle(style: ClashStyle) {
+  sound.clashStyle = style;
+  saveClashStyle(style);
+  clashButton.textContent = `clash: ${style}`;
+}
+clashButton.addEventListener("click", () => applyClashStyle(sound.clashStyle === "heavy" ? "classic" : "heavy"));
+applyClashStyle(loadClashStyle());
 
 // ---------- Player's fate ----------
 

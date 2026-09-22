@@ -240,11 +240,16 @@ button {
   100% { opacity: 0; }
 }
 
-.mute {
+.sound-controls {
   position: fixed;
   left: 18px;
   bottom: 16px;
   z-index: 20;
+  display: flex;
+  gap: 18px;
+}
+
+.sound-controls button {
   font-style: italic;
   font-weight: 700;
   color: var(--text-dim);

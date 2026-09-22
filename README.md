@@ -38,3 +38,7 @@ npm run dev
 `npm test` runs the simulation tests. Every push to `master` redeploys to GitHub Pages.
 
 Let it rip! 🚀
+
+## Credits
+
+Collision, launch and spin sounds are cut from real Beyblade X recordings in the [Beyblade pack by Sadiquecat](https://freesound.org/people/Sadiquecat/packs/41654/) on Freesound (CC0). `scripts/build_sfx.py` rebuilds `src/game/sfx/` from them.
