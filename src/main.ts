@@ -1,6 +1,7 @@
 import "./style.css";
 import { Sounds, type SoundStyle } from "./game/sounds";
 import { PlayerInput } from "./game/input";
+import { goLandscape, isTouch, watchViewport } from "./game/viewport";
 import { Renderer } from "./game/renderer";
 import { COLORS, drawTop } from "./game/art";
 import { loadBest, loadSoundStyle, loadIdentity, loadMuted, recordLife, saveSoundStyle, saveIdentity, saveMuted } from "./game/storage";
@@ -53,7 +54,14 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 const canvas = $<HTMLCanvasElement>("game");
 const renderer = new Renderer(canvas, $<HTMLCanvasElement>("minimap"));
-const input = new PlayerInput(canvas);
+watchViewport();
+const input = new PlayerInput(canvas, {
+  zone: $("joy-zone"),
+  base: $("joy-base"),
+  knob: $("joy-knob"),
+  dash: $("dash-button"),
+});
+if (isTouch) $("controls-note").textContent = "Left thumb steers. Tap dash on the right to dash.";
 const sound = new Sounds();
 
 const world = createWorld({ seed: Date.now() % 2 ** 31, bots: BOT_COUNT, pickups: PICKUP_COUNT });
@@ -133,6 +141,7 @@ function play() {
   saveIdentity(identity);
   sound.unlock();
   sound.launch();
+  void goLandscape();
   input.clear();
   player = spawnTop(world, identity);
   spawnedAt = world.time;
@@ -260,6 +269,9 @@ function updateHud() {
   const wait = Math.max(0, player.dashReadyAt - world.time);
   $("dash-fill").style.width = `${(1 - wait / CONFIG.dashCooldown) * 100}%`;
   $("dash-text").textContent = wait > 0 ? `${wait.toFixed(1)}s` : "ready";
+  const dashButton = $("dash-button");
+  dashButton.classList.toggle("cooling", wait > 0);
+  dashButton.style.setProperty("--charge", String(1 - wait / CONFIG.dashCooldown));
   if (player.knockouts !== shownKnockouts) {
     shownKnockouts = player.knockouts;
     $("ko-count").innerHTML = tally(player.knockouts);

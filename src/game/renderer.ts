@@ -1,5 +1,6 @@
 import { CONFIG, radiusOf, type KnockoutCause, type SimEvent, type Top, type TopId, type Vec, type World } from "../sim";
 import { drawTop, withAlpha } from "./art";
+import { viewSize } from "./viewport";
 
 interface Particle {
   x: number;
@@ -83,8 +84,7 @@ export class Renderer {
 
   private resize() {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
+    ({ width: this.width, height: this.height } = viewSize());
     this.canvas.width = this.width * this.dpr;
     this.canvas.height = this.height * this.dpr;
   }
@@ -615,7 +615,7 @@ export class Renderer {
       const pop = c.t < 0.12 ? 1.6 - (c.t / 0.12) * 0.6 : 1;
       const alpha = c.t > 1.1 ? Math.max(0, 1 - (c.t - 1.1) / 0.3) : 1;
       const pos = screenSpace ? { x: this.width / 2, y: this.height * 0.3 } : { x: c.at.x, y: c.at.y - 60 };
-      const size = screenSpace ? Math.min(96, this.width / 9) : 44;
+      const size = screenSpace ? Math.min(96, this.width / 9, this.height / 7) : 44;
       ctx.save();
       ctx.translate(pos.x, pos.y);
       ctx.rotate(-0.08);
