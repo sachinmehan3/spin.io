@@ -14,9 +14,6 @@ const CLASH_WINDOW = 0.1;
 /** Clashes between the same two Tops closer together than this are one grinding contact, not new hits. */
 const CONTACT_GAP = 0.15;
 
-/** Heavy: recorded Beyblade collisions. Classic: the original synthesised metal tink. */
-export type ClashStyle = "heavy" | "classic";
-
 type Hum = {
   oscs: OscillatorNode[];
   filter: BiquadFilterNode;
@@ -50,7 +47,6 @@ export class Sound {
   private samplesLoaded: Promise<void> = Promise.resolve();
   private samples = new Map<string, AudioBuffer[]>();
   muted = false;
-  clashStyle: ClashStyle = "heavy";
 
   /** Call from a user gesture (e.g. the Play button). */
   unlock() {
@@ -143,10 +139,7 @@ export class Sound {
       if (e.type === "clash") {
         const near = this.nearness(e.at, listener, e.a === pid || e.b === pid);
         if (near > 0 && this.claimClashVoice()) {
-          const impact = Math.min(1, e.impact / 700);
-          const pan = this.panOf(e.at, listener);
-          if (this.clashStyle === "classic") this.tink(impact * near, pan);
-          else this.clink(impact, near, pan, this.freshContact(e.a, e.b));
+          this.clink(Math.min(1, e.impact / 700), near, this.panOf(e.at, listener), this.freshContact(e.a, e.b));
         }
       } else if (e.type === "dash" && e.top === pid) {
         this.whoosh();
@@ -378,16 +371,6 @@ export class Sound {
       this.tone(out, 150, 45, 0.2, 0.4 * strength, "sine");
       this.noiseBurst(out, 0.15, 0.3 * strength, "lowpass", 900, 150);
     }
-  }
-
-  /** The classic Clash: a bright, light metal tink. */
-  private tink(strength: number, pan: number) {
-    if (strength < 0.03) return;
-    const out = this.output(pan, 0.4);
-    const f = 1800 + Math.random() * 1400;
-    this.tone(out, f, f * 0.9, 0.18, 0.25 * strength, "triangle");
-    this.tone(out, f * 1.51, f * 1.4, 0.12, 0.12 * strength, "sine");
-    this.noiseBurst(out, 0.06, 0.3 * strength, "bandpass", 3000);
   }
 
   /** Spinning edges rubbing: bright noise chopped at the rate the Tops' teeth pass each other. */

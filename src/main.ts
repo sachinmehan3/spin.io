@@ -1,9 +1,9 @@
 import "./style.css";
-import { Sound, type ClashStyle } from "./game/audio";
+import { Sounds, type SoundStyle } from "./game/sounds";
 import { PlayerInput } from "./game/input";
 import { Renderer } from "./game/renderer";
 import { COLORS, drawTop } from "./game/art";
-import { loadBest, loadClashStyle, loadIdentity, loadMuted, recordLife, saveClashStyle, saveIdentity, saveMuted } from "./game/storage";
+import { loadBest, loadSoundStyle, loadIdentity, loadMuted, recordLife, saveSoundStyle, saveIdentity, saveMuted } from "./game/storage";
 import {
   CONFIG,
   createWorld,
@@ -54,7 +54,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const canvas = $<HTMLCanvasElement>("game");
 const renderer = new Renderer(canvas, $<HTMLCanvasElement>("minimap"));
 const input = new PlayerInput(canvas);
-const sound = new Sound();
+const sound = new Sounds();
 
 const world = createWorld({ seed: Date.now() % 2 ** 31, bots: BOT_COUNT, pickups: PICKUP_COUNT });
 let player: Top | null = null;
@@ -170,14 +170,14 @@ window.addEventListener("keydown", (e) => {
 });
 applyMute(loadMuted());
 
-const clashButton = $<HTMLButtonElement>("clash-style");
-function applyClashStyle(style: ClashStyle) {
-  sound.clashStyle = style;
-  saveClashStyle(style);
-  clashButton.textContent = `clash: ${style}`;
+const styleButton = $<HTMLButtonElement>("sound-style");
+function applySoundStyle(style: SoundStyle) {
+  sound.setStyle(style);
+  saveSoundStyle(style);
+  styleButton.textContent = `sounds: ${style}`;
 }
-clashButton.addEventListener("click", () => applyClashStyle(sound.clashStyle === "heavy" ? "classic" : "heavy"));
-applyClashStyle(loadClashStyle());
+styleButton.addEventListener("click", () => applySoundStyle(sound.style === "heavy" ? "classic" : "heavy"));
+applySoundStyle(loadSoundStyle());
 
 // ---------- Player's fate ----------
 

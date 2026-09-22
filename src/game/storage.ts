@@ -1,5 +1,5 @@
 import type { Identity } from "../sim";
-import type { ClashStyle } from "./audio";
+import type { SoundStyle } from "./sounds";
 
 // Per-browser conveniences only. Storage may be unavailable (private mode, blocked site
 // data), so every access is guarded and the game works without it.
@@ -17,7 +17,7 @@ interface Saved {
   identity?: Identity;
   best?: PersonalBest;
   muted?: boolean;
-  clashStyle?: ClashStyle;
+  soundStyle?: SoundStyle;
 }
 
 function load(): Saved {
@@ -41,8 +41,8 @@ export const loadIdentity = () => load().identity;
 export const saveIdentity = (identity: Identity) => save({ identity });
 export const loadMuted = () => load().muted ?? false;
 export const saveMuted = (muted: boolean) => save({ muted });
-export const loadClashStyle = (): ClashStyle => (load().clashStyle === "classic" ? "classic" : "heavy");
-export const saveClashStyle = (clashStyle: ClashStyle) => save({ clashStyle });
+export const loadSoundStyle = (): SoundStyle => (load().soundStyle === "classic" ? "classic" : "heavy");
+export const saveSoundStyle = (soundStyle: SoundStyle) => save({ soundStyle });
 export const loadBest = (): PersonalBest => load().best ?? { peakMaxSpin: 0, knockouts: 0 };
 
 /** Records a finished life; returns true if it set a new personal best on either measure. */
