@@ -1,6 +1,6 @@
 import { CONFIG, radiusOf, type KnockoutCause, type SimEvent, type Top, type TopId, type Vec, type World } from "../sim";
 import { drawTop, withAlpha } from "./art";
-import { viewSize } from "./viewport";
+import { isTouch, viewSize } from "./viewport";
 
 interface Particle {
   x: number;
@@ -42,6 +42,16 @@ interface Callout {
 }
 
 const TRAIL_LENGTH = 16;
+/**
+ * The stadium's soft layers (gradients and glows) are drawn once at this fraction of world
+ * resolution and scaled up each frame: smooth shading survives it, and redrawing them every
+ * frame was the single biggest cost on phones.
+ */
+const STADIUM_CACHE_SCALE = 1 / 6;
+/** Phones draw at no more than this many device pixels per CSS pixel; the difference is hard to see on a small screen. */
+const TOUCH_MAX_DPR = 1.5;
+/** If frames average longer than this (seconds), drop the resolution a notch, down to 1 device pixel per CSS pixel. */
+const SLOW_FRAME = 1 / 40;
 const FINISH: Record<KnockoutCause, string> = {
   burst: "BURST FINISH!",
   "ring-out": "OVER FINISH!",
@@ -66,11 +76,21 @@ export class Renderer {
   private width = 0;
   private height = 0;
   private dpr = 1;
+  /** Highest pixel density to draw at; lowered for good if the device can't keep up. */
+  private maxDpr = Math.min(window.devicePixelRatio || 1, isTouch ? TOUCH_MAX_DPR : 2);
+  private frameTime = 1 / 60;
+  private qualityCheckAt = 3;
+  private stadium: { base: StadiumLayer; danger: StadiumLayer; lipGlow: StadiumLayer } | null = null;
   private clock = 0;
   /** The impact frame: radial speed lines centred on one of the Player's big hits. */
   private impact = { t: 0, at: { x: 0, y: 0 } as Vec, strength: 0 };
   /** Seconds the action should freeze for, to sell a heavy hit. The game loop reads this. */
   hitStop = 0;
+
+  /** Device pixels per CSS pixel currently drawn at (for the ?fps readout). */
+  get pixelDensity() {
+    return this.dpr;
+  }
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -83,7 +103,7 @@ export class Renderer {
   }
 
   private resize() {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.dpr = this.maxDpr;
     ({ width: this.width, height: this.height } = viewSize());
     this.canvas.width = this.width * this.dpr;
     this.canvas.height = this.height * this.dpr;
@@ -182,6 +202,7 @@ export class Renderer {
 
   render(world: World, player: Top | null, dt: number) {
     this.clock += dt;
+    this.adaptQuality(dt);
     this.updateVisuals(world, dt);
     this.updateCamera(player, dt);
     this.updateParticles(dt);
@@ -209,6 +230,18 @@ export class Renderer {
     this.drawImpactFrame(dt);
     this.drawCallouts(0, true);
     this.drawMinimap(world, player);
+  }
+
+  /** Watches how long frames take and, on a device that can't keep up, draws at a lower resolution. */
+  private adaptQuality(dt: number) {
+    // One long hitch (a tab switch, a hit-stop) shouldn't count as a slow device.
+    this.frameTime += (Math.min(dt, 1 / 15) - this.frameTime) * 0.05;
+    if (this.clock < this.qualityCheckAt) return;
+    this.qualityCheckAt = this.clock + 2;
+    if (this.frameTime > SLOW_FRAME && this.maxDpr > 1) {
+      this.maxDpr = Math.max(1, this.maxDpr - 0.25);
+      this.resize();
+    }
   }
 
   private updateVisuals(world: World, dt: number) {
@@ -272,25 +305,12 @@ export class Renderer {
     const ctx = this.ctx;
     const R = CONFIG.arenaRadius;
     const v = this.view();
+    this.stadium ??= bakeStadium();
+    const { base, danger, lipGlow } = this.stadium;
 
     ctx.fillStyle = "#05070d";
     ctx.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
-    const glow = ctx.createRadialGradient(0, 0, R, 0, 0, R * 1.8);
-    glow.addColorStop(0, "rgba(40, 70, 160, 0.35)");
-    glow.addColorStop(1, "rgba(5, 7, 13, 0)");
-    ctx.fillStyle = glow;
-    ctx.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
-
-    // Dish: lit from above, darker toward the wall, like a bowl.
-    const dish = ctx.createRadialGradient(-R * 0.15, -R * 0.2, R * 0.05, 0, 0, R);
-    dish.addColorStop(0, "#3d5fb8");
-    dish.addColorStop(0.45, "#223f8a");
-    dish.addColorStop(0.85, "#142659");
-    dish.addColorStop(1, "#0a1433");
-    ctx.fillStyle = dish;
-    ctx.beginPath();
-    ctx.arc(0, 0, R, 0, Math.PI * 2);
-    ctx.fill();
+    drawLayer(ctx, base);
 
     ctx.lineWidth = 3;
     for (let r = 160; r < R; r += 110) {
@@ -315,23 +335,16 @@ export class Renderer {
       ctx.stroke();
     }
 
-    // Centre cone.
-    const cone = ctx.createRadialGradient(-20, -20, 0, 0, 0, 120);
-    cone.addColorStop(0, "#9fb8ff");
-    cone.addColorStop(1, "rgba(60, 90, 180, 0)");
-    ctx.fillStyle = cone;
-    ctx.beginPath();
-    ctx.arc(0, 0, 120, 0, Math.PI * 2);
-    ctx.fill();
+    // The red glows only live near the wall; drawing them from the middle would fill the whole
+    // screen with transparent pixels.
+    const nearWall = Math.max(Math.hypot(v.x0, v.y0), Math.hypot(v.x1, v.y0), Math.hypot(v.x0, v.y1), Math.hypot(v.x1, v.y1)) > R * 0.86;
 
-    // Danger glow just inside the wall.
-    const danger = ctx.createRadialGradient(0, 0, R * 0.88, 0, 0, R);
-    danger.addColorStop(0, "rgba(255, 40, 80, 0)");
-    danger.addColorStop(1, `rgba(255, 40, 80, ${0.22 + Math.sin(this.clock * 4) * 0.06})`);
-    ctx.fillStyle = danger;
-    ctx.beginPath();
-    ctx.arc(0, 0, R, 0, Math.PI * 2);
-    ctx.fill();
+    // Danger glow just inside the wall, pulsing.
+    if (nearWall) {
+      ctx.globalAlpha = 0.22 + Math.sin(this.clock * 4) * 0.06;
+      drawLayer(ctx, danger);
+      ctx.globalAlpha = 1;
+    }
 
     // Rim wall: brushed steel with dark notches, and a hot red lip where Tops fly out.
     const wall = ctx.createLinearGradient(-R, -R, R, R);
@@ -358,15 +371,12 @@ export class Renderer {
       ctx.fillRect(R + 8, -5, 54, 10);
       ctx.restore();
     }
-    ctx.save();
-    ctx.shadowColor = "#ff2850";
-    ctx.shadowBlur = 30;
+    if (nearWall) drawLayer(ctx, lipGlow);
     ctx.lineWidth = 8;
     ctx.strokeStyle = "#ff3b5c";
     ctx.beginPath();
     ctx.arc(0, 0, R, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.restore();
   }
 
   private drawPickups(world: World) {
@@ -670,6 +680,82 @@ export class Renderer {
       m.shadowBlur = 0;
     }
   }
+}
+
+/** A low-resolution image of part of the stadium, centred on the arena's centre, `extent` world units in each direction. */
+interface StadiumLayer {
+  image: HTMLCanvasElement;
+  extent: number;
+}
+
+function bakeLayer(extent: number, paint: (ctx: CanvasRenderingContext2D) => void): StadiumLayer {
+  const image = document.createElement("canvas");
+  image.width = image.height = Math.ceil(extent * 2 * STADIUM_CACHE_SCALE);
+  const ctx = image.getContext("2d")!;
+  ctx.scale(STADIUM_CACHE_SCALE, STADIUM_CACHE_SCALE);
+  ctx.translate(extent, extent);
+  paint(ctx);
+  return { image, extent };
+}
+
+function drawLayer(ctx: CanvasRenderingContext2D, { image, extent }: StadiumLayer) {
+  ctx.drawImage(image, -extent, -extent, extent * 2, extent * 2);
+}
+
+/** The stadium's soft layers, painted once: they never change except the danger glow's pulse, done with opacity. */
+function bakeStadium() {
+  const R = CONFIG.arenaRadius;
+  const base = bakeLayer(R * 1.8, (ctx) => {
+    const glow = ctx.createRadialGradient(0, 0, R, 0, 0, R * 1.8);
+    glow.addColorStop(0, "rgba(40, 70, 160, 0.35)");
+    glow.addColorStop(1, "rgba(5, 7, 13, 0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(-R * 1.8, -R * 1.8, R * 3.6, R * 3.6);
+
+    // Dish: lit from above, darker toward the wall, like a bowl.
+    const dish = ctx.createRadialGradient(-R * 0.15, -R * 0.2, R * 0.05, 0, 0, R);
+    dish.addColorStop(0, "#3d5fb8");
+    dish.addColorStop(0.45, "#223f8a");
+    dish.addColorStop(0.85, "#142659");
+    dish.addColorStop(1, "#0a1433");
+    ctx.fillStyle = dish;
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Centre cone.
+    const cone = ctx.createRadialGradient(-20, -20, 0, 0, 0, 120);
+    cone.addColorStop(0, "#9fb8ff");
+    cone.addColorStop(1, "rgba(60, 90, 180, 0)");
+    ctx.fillStyle = cone;
+    ctx.beginPath();
+    ctx.arc(0, 0, 120, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Painted at full strength; drawn each frame at the pulse's opacity.
+  const danger = bakeLayer(R, (ctx) => {
+    const g = ctx.createRadialGradient(0, 0, R * 0.88, 0, 0, R);
+    g.addColorStop(0, "rgba(255, 40, 80, 0)");
+    g.addColorStop(1, "rgba(255, 40, 80, 1)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // The red lip's glow. Shadow blur is in the image's own pixels, so it's scaled to match.
+  const lipGlow = bakeLayer(R + 80, (ctx) => {
+    ctx.shadowColor = "#ff2850";
+    ctx.shadowBlur = 30 * STADIUM_CACHE_SCALE * 1.5;
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = "#ff3b5c";
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  return { base, danger, lipGlow };
 }
 
 function spinRate(t: Top): number {

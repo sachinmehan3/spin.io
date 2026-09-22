@@ -852,6 +852,20 @@ input:focus {
   font-size: 20px;
 }
 
+/* ?fps in the URL: a frame-rate readout for checking performance on a device. */
+.fps {
+  position: fixed;
+  top: 4px;
+  left: 50%;
+  z-index: 30;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  font: 700 12px var(--ui);
+  color: var(--cyan);
+  background: rgba(5, 7, 13, 0.7);
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .toast {
     animation-duration: 3s;

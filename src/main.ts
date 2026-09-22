@@ -262,16 +262,17 @@ function updateHud() {
   if (!player?.alive) return;
   const frac = player.spin / player.maxSpin;
   const fill = $("spin-fill");
-  fill.style.width = `${frac * 100}%`;
+  show(fill.style, "width", `${Math.round(frac * 200) / 2}%`);
   fill.classList.toggle("low", frac < 0.3);
-  $("spin-text").textContent = String(Math.ceil(player.spin));
+  show($("spin-text"), "textContent", String(Math.ceil(player.spin)));
 
   const wait = Math.max(0, player.dashReadyAt - world.time);
-  $("dash-fill").style.width = `${(1 - wait / CONFIG.dashCooldown) * 100}%`;
-  $("dash-text").textContent = wait > 0 ? `${wait.toFixed(1)}s` : "ready";
+  const charge = Math.round((1 - wait / CONFIG.dashCooldown) * 100) / 100;
+  show($("dash-fill").style, "width", `${charge * 100}%`);
+  show($("dash-text"), "textContent", wait > 0 ? `${wait.toFixed(1)}s` : "ready");
   const dashButton = $("dash-button");
   dashButton.classList.toggle("cooling", wait > 0);
-  dashButton.style.setProperty("--charge", String(1 - wait / CONFIG.dashCooldown));
+  if (dashButton.style.getPropertyValue("--charge") !== String(charge)) dashButton.style.setProperty("--charge", String(charge));
   if (player.knockouts !== shownKnockouts) {
     shownKnockouts = player.knockouts;
     $("ko-count").innerHTML = tally(player.knockouts);
@@ -284,6 +285,11 @@ function updateHud() {
   const rank = ranked.indexOf(player) + 1;
   if (rank > 10) rows.push(boardRow(rank, player));
   $("board").replaceChildren(...rows);
+}
+
+/** Writes a HUD value only if it changed: every DOM write can cost a style and layout pass, which phones feel. */
+function show<T extends object, K extends keyof T>(target: T, key: K, value: T[K]) {
+  if (target[key] !== value) target[key] = value;
 }
 
 function boardRow(rank: number, t: Top) {
@@ -304,7 +310,20 @@ function boardRow(rank: number, t: Top) {
 let lastFrameTime = performance.now();
 let accumulator = 0;
 
+const fpsReadout = new URLSearchParams(location.search).has("fps") ? $("app").appendChild(document.createElement("div")) : null;
+if (fpsReadout) fpsReadout.className = "fps";
+let fpsFrames = 0;
+let fpsSince = performance.now();
+
 function frame(now: number) {
+  if (fpsReadout) {
+    fpsFrames++;
+    if (now - fpsSince >= 1000) {
+      fpsReadout.textContent = `${Math.round((fpsFrames * 1000) / (now - fpsSince))} fps · ${renderer.pixelDensity}x`;
+      fpsFrames = 0;
+      fpsSince = now;
+    }
+  }
   const elapsed = Math.min(MAX_FRAME_TIME, (now - lastFrameTime) / 1000);
   lastFrameTime = now;
   // A heavy hit freezes the action for a split second (hit-stop), then play resumes.
