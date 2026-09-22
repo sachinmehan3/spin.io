@@ -3,8 +3,8 @@ import { isTouch, toView, viewSize } from "./viewport";
 
 /** How far (CSS px) the cursor must be from the Player's Top for full throttle. */
 const FULL_THROTTLE_DISTANCE = 160;
-/** How far (CSS px) the joystick knob travels from its centre; the edge is full throttle. */
-const STICK_RADIUS = 46;
+/** How far the joystick knob travels from its centre, as a fraction of the base's width; the edge is full throttle. */
+const STICK_TRAVEL = 0.4;
 /** Below this knob travel (CSS px) the joystick reads as centred, so a resting thumb doesn't creep. */
 const STICK_DEAD_ZONE = 6;
 
@@ -83,17 +83,18 @@ export class PlayerInput {
   private bindTouch({ zone, base, knob, dash }: TouchControls) {
     let finger: number | null = null;
     let origin: Vec = { x: 0, y: 0 };
+    let radius = 1;
 
     const move = (at: Vec) => {
       let dx = at.x - origin.x;
       let dy = at.y - origin.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > STICK_RADIUS) {
-        dx *= STICK_RADIUS / dist;
-        dy *= STICK_RADIUS / dist;
+      if (dist > radius) {
+        dx *= radius / dist;
+        dy *= radius / dist;
       }
       knob.style.transform = `translate(${dx}px, ${dy}px)`;
-      this.stick = dist < STICK_DEAD_ZONE ? { x: 0, y: 0 } : { x: dx / STICK_RADIUS, y: dy / STICK_RADIUS };
+      this.stick = dist < STICK_DEAD_ZONE ? { x: 0, y: 0 } : { x: dx / radius, y: dy / radius };
     };
     const release = () => {
       finger = null;
@@ -110,6 +111,7 @@ export class PlayerInput {
         if (finger !== null) return;
         const t = e.changedTouches[0];
         finger = t.identifier;
+        radius = base.offsetWidth * STICK_TRAVEL;
         origin = toView(t.clientX, t.clientY);
         base.style.left = `${origin.x}px`;
         base.style.top = `${origin.y}px`;

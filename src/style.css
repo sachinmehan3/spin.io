@@ -596,13 +596,16 @@ input:focus {
   z-index: 5;
 }
 
+/* Rests where a left thumb naturally sits in landscape: a third of the way up, in from the edge.
+   Sized from the screen height; input.ts reads the size back for the knob's travel. */
 .joy-base {
+  --size: clamp(110px, calc(var(--view-h, 100vh) * 0.36), 150px);
   position: absolute;
-  left: 84px;
-  top: calc(100% - 84px);
-  width: 92px;
-  height: 92px;
-  margin: -46px 0 0 -46px;
+  left: max(110px, 13%);
+  top: calc(100% - max(120px, 32%));
+  width: var(--size);
+  height: var(--size);
+  margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
   border-radius: 50%;
   border: 2px solid rgba(238, 242, 255, 0.2);
   background: rgba(10, 13, 22, 0.25);
@@ -620,9 +623,9 @@ input:focus {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 40px;
-  height: 40px;
-  margin: -20px 0 0 -20px;
+  width: 42%;
+  height: 42%;
+  margin: -21% 0 0 -21%;
   border-radius: 50%;
   background: rgba(238, 242, 255, 0.35);
   box-shadow: 0 0 10px rgba(125, 252, 255, 0.35);
@@ -633,14 +636,15 @@ input:focus {
 .dash-button {
   --charge: 1;
   position: fixed;
-  right: 26px;
-  bottom: 26px;
+  /* Where the right thumb rests, mirroring the joystick. */
+  right: max(56px, 7%);
+  bottom: max(84px, 24%);
   z-index: 5;
-  width: 104px;
-  height: 52px;
+  width: 124px;
+  height: 62px;
   padding-top: 3px;
   font-family: var(--display);
-  font-size: 30px;
+  font-size: 36px;
   letter-spacing: 0.05em;
   color: var(--ink);
   background:
